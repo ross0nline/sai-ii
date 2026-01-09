@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Header } from './components/Header';
 import { ChatContainer } from './components/ChatContainer';
@@ -23,6 +23,22 @@ import type { Message, MessageMetadata } from './types';
 function App() {
   const { sidebarOpen, setSidebarOpen, sidebarWidth } = useLayoutStore();
   const { setTheme, theme } = useThemeStore();
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [sidebarOpen, setSidebarOpen]);
 
   useEffect(() => {
     setTheme(theme);
@@ -211,7 +227,7 @@ function App() {
       <Header modelStatus={modelStatus} />
 
       {modelStatus.error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 dark:border-red-400 p-4 mx-6 mt-6 rounded-lg">
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 dark:border-red-400 p-4 mx-4 sm:mx-6 mt-4 sm:mt-6 rounded-lg">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0">
               <svg className="w-5 h-5 text-red-500 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
@@ -241,7 +257,7 @@ function App() {
               )}
               {window.self === window.top && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-                  Check the Statistics panel on the right for more details and troubleshooting steps.
+                  Check the Statistics panel for more details and troubleshooting steps.
                 </p>
               )}
             </div>
@@ -249,7 +265,7 @@ function App() {
         </div>
       )}
 
-      <div className="flex-1 flex p-6 max-w-[1800px] mx-auto w-full relative" data-layout-container>
+      <div className="flex-1 flex flex-col md:flex-row p-4 sm:p-6 max-w-[1800px] mx-auto w-full relative" data-layout-container>
         <div className="flex-1 flex flex-col bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden min-w-0">
           <ChatContainer
             messages={messages}
@@ -265,33 +281,72 @@ function App() {
           />
         </div>
 
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute top-4 right-4 z-10 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 border border-slate-200 dark:border-slate-700"
-          title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
-        >
-          {sidebarOpen ? (
-            <PanelRightClose className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-          ) : (
-            <PanelRightOpen className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-          )}
-        </button>
+        {/* Mobile: Floating toggle button */}
+        {isMobile && (
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="fixed bottom-20 right-4 z-40 p-4 bg-blue-600 text-white rounded-full shadow-2xl hover:shadow-blue-500/50 transition-all duration-200 hover:scale-110"
+            title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+          >
+            {sidebarOpen ? (
+              <PanelRightClose className="w-6 h-6" />
+            ) : (
+              <PanelRightOpen className="w-6 h-6" />
+            )}
+          </button>
+        )}
 
-        {sidebarOpen && <ResizableDivider />}
+        {/* Desktop: Corner toggle button */}
+        {!isMobile && (
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="absolute top-4 right-4 z-10 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 border border-slate-200 dark:border-slate-700"
+            title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+          >
+            {sidebarOpen ? (
+              <PanelRightClose className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            ) : (
+              <PanelRightOpen className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            )}
+          </button>
+        )}
 
-        <div
-          className={`transition-all duration-300 ease-in-out overflow-hidden ${
-            sidebarOpen ? 'opacity-100' : 'w-0 opacity-0'
-          }`}
-          style={{ width: sidebarOpen ? `${sidebarWidth}px` : '0px' }}
-        >
-          <div className="h-full space-y-6 flex-shrink-0" style={{ width: `${sidebarWidth}px` }}>
-            <StatsDashboard modelStatus={modelStatus} />
-            <ParameterControls />
-            <QuickTips />
-            <BenchmarkPanel />
+        {/* Mobile: Full-screen overlay sidebar */}
+        {isMobile && sidebarOpen && (
+          <>
+            <div 
+              className="fixed inset-0 bg-black/50 z-30"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white dark:bg-slate-900 z-40 overflow-y-auto shadow-2xl">
+              <div className="p-6 space-y-6">
+                <StatsDashboard modelStatus={modelStatus} />
+                <ParameterControls />
+                <QuickTips />
+                <BenchmarkPanel />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Desktop: Resizable sidebar */}
+        {!isMobile && sidebarOpen && <ResizableDivider />}
+
+        {!isMobile && (
+          <div
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${
+              sidebarOpen ? 'opacity-100' : 'w-0 opacity-0'
+            }`}
+            style={{ width: sidebarOpen ? `${sidebarWidth}px` : '0px' }}
+          >
+            <div className="h-full space-y-6 flex-shrink-0" style={{ width: `${sidebarWidth}px` }}>
+              <StatsDashboard modelStatus={modelStatus} />
+              <ParameterControls />
+              <QuickTips />
+              <BenchmarkPanel />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <HelpModal />
